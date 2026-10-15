@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Logement extends Model
 {
@@ -37,5 +38,10 @@ class Logement extends Model
     public function quartier(): BelongsTo
     {
         return $this->belongsTo(Quartier::class, 'id_quartier', 'id_quartier');
+    }
+
+    public function photos(): HasMany
+    {
+        return $this->hasMany(LogementPhoto::class)->orderBy('ordre')->orderBy('id');
     }
 }

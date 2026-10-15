@@ -7,9 +7,22 @@ use Illuminate\Http\Request;
 
 class QuartierController extends Controller
 {
-    public function index()
+    /**
+     * Valide le filtre transmis par React et renvoie les quartiers correspondants en JSON.
+     */
+    public function index(Request $request)
     {
-        $quartiers = Quartier::with('ville')->get();
+        $filters = $request->validate([
+            'id_ville' => ['sometimes', 'string', 'max:5', 'exists:villes,id_ville'],
+        ]);
+
+        $quartiers = Quartier::with('ville:id_ville,nom_Ville')
+            ->when(
+                isset($filters['id_ville']),
+                fn ($query) => $query->where('id_ville', $filters['id_ville']),
+            )
+            ->orderBy('nom_quartier')
+            ->get();
 
         return response()->json($quartiers);
     }

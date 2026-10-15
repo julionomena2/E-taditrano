@@ -7,9 +7,30 @@ use Illuminate\Http\Request;
 
 class EtablissementController extends Controller
 {
-    public function index()
+    /**
+     * Filtre les établissements selon les identifiants reçus du formulaire de recherche React.
+     */
+    public function index(Request $request)
     {
-        $etablissements = Etablissement::with('quartier')->get();
+        $filters = $request->validate([
+            'id_ville' => ['sometimes', 'string', 'max:5', 'exists:villes,id_ville'],
+            'id_quartier' => ['sometimes', 'string', 'max:20', 'exists:quartiers,id_quartier'],
+        ]);
+
+        $etablissements = Etablissement::with('quartier:id_quartier,nom_quartier,id_ville')
+            ->when(
+                isset($filters['id_quartier']),
+                fn ($query) => $query->where('id_quartier', $filters['id_quartier']),
+            )
+            ->when(
+                isset($filters['id_ville']),
+                fn ($query) => $query->whereHas(
+                    'quartier',
+                    fn ($quartiers) => $quartiers->where('id_ville', $filters['id_ville']),
+                ),
+            )
+            ->orderBy('nom_etablissement')
+            ->get();
 
         return response()->json($etablissements);
     }

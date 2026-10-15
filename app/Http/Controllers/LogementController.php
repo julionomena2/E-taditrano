@@ -7,9 +7,23 @@ use Illuminate\Http\Request;
 
 class LogementController extends Controller
 {
-    public function index()
+    /**
+     * Renvoie au frontend les logements disponibles, éventuellement limités à un quartier.
+     */
+    public function index(Request $request)
     {
-        $logements = Logement::with(['utilisateur', 'quartier'])->get();
+        $filters = $request->validate([
+            'id_quartier' => ['sometimes', 'string', 'max:20', 'exists:quartiers,id_quartier'],
+        ]);
+
+        $logements = Logement::with(['quartier:id_quartier,nom_quartier,id_ville', 'photos'])
+            ->when(
+                isset($filters['id_quartier']),
+                fn ($query) => $query->where('id_quartier', $filters['id_quartier']),
+            )
+            ->whereRaw('LOWER(status) = ?', ['disponible'])
+            ->latest('date_publication')
+            ->get();
 
         return response()->json($logements);
     }
@@ -36,7 +50,8 @@ class LogementController extends Controller
 
     public function show(int $id)
     {
-        $logement = Logement::with(['utilisateur', 'quartier'])->findOrFail($id);
+        $logement = Logement::with(['quartier:id_quartier,nom_quartier,id_ville', 'photos'])
+            ->findOrFail($id);
 
         return response()->json($logement);
     }
@@ -71,20 +86,25 @@ class LogementController extends Controller
         return response()->json(null, 204);
     }
 
+    /**
+     * Valide les coordonnées envoyées par React, calcule les distances et renvoie les annonces dans le rayon demandé.
+     */
     public function nearestFromEtablissement(Request $request)
     {
-        $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'rayon_km' => 'nullable|numeric|min:0.1',
+        $filters = $request->validate([
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+            'rayon_km' => ['nullable', 'numeric', 'min:0.1'],
+            'id_quartier' => ['sometimes', 'string', 'max:20', 'exists:quartiers,id_quartier'],
         ]);
 
-        $lat = $request->latitude;
-        $lng = $request->longitude;
-        $rayon = $request->rayon_km ?? 5;
+        $lat = $filters['latitude'];
+        $lng = $filters['longitude'];
+        $rayon = $filters['rayon_km'] ?? 5;
 
-        $logements = Logement::selectRaw(
-            "
+        $logements = Logement::with(['quartier:id_quartier,nom_quartier,id_ville', 'photos'])
+            ->selectRaw(
+                '
                 logements.*,
                 (
                     6371 * acos(
@@ -94,10 +114,15 @@ class LogementController extends Controller
                         sin(radians(?)) * sin(radians(latitude))
                     )
                 ) AS distance_km
-            ",
-            [$lat, $lng, $lat]
-        )
+            ',
+                [$lat, $lng, $lat]
+            )
             ->having('distance_km', '<=', $rayon)
+            ->when(
+                isset($filters['id_quartier']),
+                fn ($query) => $query->where('id_quartier', $filters['id_quartier']),
+            )
+            ->whereRaw('LOWER(status) = ?', ['disponible'])
             ->orderBy('distance_km')
             ->get();
 

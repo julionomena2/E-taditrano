@@ -7,9 +7,14 @@ use Illuminate\Http\Request;
 
 class VilleController extends Controller
 {
+    /**
+     * Fournit au formulaire React la liste minimale des villes sous forme de JSON.
+     */
     public function index()
     {
-        $villes = Ville::all();
+        $villes = Ville::query()
+            ->orderBy('nom_Ville')
+            ->get(['id_ville', 'nom_Ville']);
 
         return response()->json($villes);
     }
