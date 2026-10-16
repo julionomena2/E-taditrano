@@ -276,6 +276,16 @@ export async function getLogementsParQuartier(idQuartier, etablissement = null) 
   return (await appelerApi(`${chemin}?${filtres}`)).map(mapperLogement);
 }
 
+export async function getLogementsProches(position) {
+  const filtres = new URLSearchParams({
+    latitude: String(position.latitude),
+    longitude: String(position.longitude),
+    rayon_km: "25",
+  });
+
+  return (await appelerApi(`/logements/proches?${filtres}`)).map(mapperLogement);
+}
+
 export async function inscrire(donneesInscription) {
   const csrfToken = await obtenirJetonCsrf();
   // FormData transporte aussi la photo ; le navigateur ajoute lui-même la limite multipart/form-data.

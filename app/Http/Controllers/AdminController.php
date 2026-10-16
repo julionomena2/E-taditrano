@@ -9,7 +9,8 @@ use App\Models\Utilisateur;
 use App\Models\Ville;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class AdminController extends Controller
 {
@@ -82,6 +83,15 @@ class AdminController extends Controller
         abort_unless(array_key_exists($model, $config), 404);
 
         $data = $request->validate($config[$model]['rules'] ?? $this->defaultRules($model));
+        if ($model === 'utilisateurs' && $request->hasFile('photo')) {
+            $path = $request->file('photo')->storePublicly('utilisateurs', 'public');
+            if ($path === false) {
+                throw new RuntimeException('La photo de profil n’a pas pu être enregistrée.');
+            }
+
+            $data['photo'] = $path;
+        }
+
         $this->getModel($model)::create($data);
 
         return redirect()->route($config[$model]['routeName'])->with('success', 'Enregistrement ajouté avec succès.');
@@ -96,7 +106,25 @@ class AdminController extends Controller
 
         $record = $this->getModel($model)::findOrFail($id);
         $data = $request->validate($config[$model]['updateRules'] ?? $config[$model]['rules'] ?? $this->defaultRules($model));
+        if ($model === 'utilisateurs' && blank($data['mot_de_passe'] ?? null)) {
+            unset($data['mot_de_passe']);
+        }
+
+        $oldPhoto = null;
+        if ($model === 'utilisateurs' && $request->hasFile('photo')) {
+            $path = $request->file('photo')->storePublicly('utilisateurs', 'public');
+            if ($path === false) {
+                throw new RuntimeException('La photo de profil n’a pas pu être enregistrée.');
+            }
+
+            $oldPhoto = $record->photo;
+            $data['photo'] = $path;
+        }
+
         $record->update($data);
+        if ($oldPhoto !== null) {
+            Storage::disk('public')->delete($oldPhoto);
+        }
 
         return redirect()->route($config[$model]['routeName'])->with('success', 'Enregistrement mis à jour avec succès.');
     }
@@ -110,6 +138,9 @@ class AdminController extends Controller
 
         $record = $this->getModel($model)::findOrFail($id);
         $record->delete();
+        if ($model === 'utilisateurs' && $record->photo !== null) {
+            Storage::disk('public')->delete($record->photo);
+        }
 
         return redirect()->route($config[$model]['routeName'])->with('success', 'Enregistrement supprimé avec succès.');
     }
@@ -156,19 +187,22 @@ class AdminController extends Controller
                     'prenom' => ['label' => 'Prénom', 'type' => 'text', 'placeholder' => 'Prénom'],
                     'mot_de_passe' => ['label' => 'Mot de passe', 'type' => 'password', 'placeholder' => '••••••'],
                     'telephone' => ['label' => 'Téléphone', 'type' => 'text', 'placeholder' => '0123456789'],
+                    'photo' => ['label' => 'Photo de profil', 'type' => 'image'],
                 ],
                 'rules' => [
                     'id_utilisateur' => ['required', 'string', 'max:50', 'unique:utilisateurs,id_utilisateur'],
                     'nom' => ['required', 'string', 'max:100'],
                     'prenom' => ['required', 'string', 'max:100'],
-                    'mot_de_passe' => ['required', 'string', 'max:10'],
+                    'mot_de_passe' => ['required', 'string', 'min:8', 'max:128'],
                     'telephone' => ['required', 'string', 'max:10'],
+                    'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
                 ],
                 'updateRules' => [
                     'nom' => ['sometimes', 'string', 'max:100'],
                     'prenom' => ['sometimes', 'string', 'max:100'],
-                    'mot_de_passe' => ['sometimes', 'string', 'max:10'],
+                    'mot_de_passe' => ['sometimes', 'nullable', 'string', 'min:8', 'max:128'],
                     'telephone' => ['sometimes', 'string', 'max:10'],
+                    'photo' => ['sometimes', 'nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
                 ],
             ],
             'villes' => [

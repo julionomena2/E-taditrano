@@ -6,11 +6,29 @@
 import { useEffect, useState } from "react";
 import {
   getEtablissementsParQuartier,
+  getLogementsProches,
   getQuartiersParVille,
   getVilles,
 } from "../services/api.js";
+import { CarteLogement } from "./ListeLogements.jsx";
 
-export default function Accueil({ onRechercheLogements, allerA }) {
+function messageErreurGeolocalisation(code) {
+  if (code === 1) {
+    return "L’accès à votre position a été refusé. Autorisez la localisation dans les paramètres du navigateur.";
+  }
+
+  if (code === 2) {
+    return "Votre position est indisponible. Vérifiez que la localisation est activée sur votre appareil.";
+  }
+
+  if (code === 3) {
+    return "La recherche de votre position a expiré. Réessayez.";
+  }
+
+  return "Votre position n’a pas pu être déterminée.";
+}
+
+export default function Accueil({ onRechercheLogements, onLogementChoisi, allerA }) {
   const [villes, setVilles] = useState([]);
   const [quartiers, setQuartiers] = useState([]);
   const [etablissements, setEtablissements] = useState([]);
@@ -21,6 +39,10 @@ export default function Accueil({ onRechercheLogements, allerA }) {
   const [chargementQuartiers, setChargementQuartiers] = useState(false);
   const [chargementEtablissements, setChargementEtablissements] = useState(false);
   const [erreurChargement, setErreurChargement] = useState("");
+  const [positionVisiteur, setPositionVisiteur] = useState(null);
+  const [logementsProches, setLogementsProches] = useState([]);
+  const [etatProximite, setEtatProximite] = useState("repos");
+  const [erreurProximite, setErreurProximite] = useState("");
 
   useEffect(() => {
     // Charge le catalogue de départ une seule fois ; ces données alimentent le premier sélecteur.
@@ -68,6 +90,68 @@ export default function Accueil({ onRechercheLogements, allerA }) {
     });
     return () => { actif = false; };
   }, [quartierId]);
+
+  useEffect(() => {
+    if (!positionVisiteur) {
+      return undefined;
+    }
+
+    let actif = true;
+
+    getLogementsProches(positionVisiteur)
+      .then((donnees) => {
+        if (actif) {
+          setLogementsProches(donnees);
+          setEtatProximite("termine");
+        }
+      })
+      .catch((erreurApi) => {
+        if (actif) {
+          setErreurProximite(erreurApi.message || "Les logements proches n’ont pas pu être chargés.");
+          setEtatProximite("erreur");
+        }
+      });
+
+    return () => {
+      actif = false;
+    };
+  }, [positionVisiteur]);
+
+  function rechercherAutourDeMoi() {
+    setErreurProximite("");
+
+    if (!window.isSecureContext) {
+      setErreurProximite("La géolocalisation exige HTTPS (ou localhost en développement).");
+      setEtatProximite("erreur");
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setErreurProximite("La géolocalisation n’est pas disponible dans ce navigateur.");
+      setEtatProximite("erreur");
+      return;
+    }
+
+    setEtatProximite("localisation");
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setPositionVisiteur({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        });
+        setEtatProximite("chargement");
+      },
+      (erreur) => {
+        setErreurProximite(messageErreurGeolocalisation(erreur.code));
+        setEtatProximite("erreur");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 60000,
+      },
+    );
+  }
 
   function choisirVille(id) {
     if (String(id) === villeId) return;
@@ -122,6 +206,55 @@ export default function Accueil({ onRechercheLogements, allerA }) {
 
       <div className="accueil-fil">
 
+        <section className="proximite-accueil" aria-labelledby="titre-proximite">
+          <div className="proximite-accueil-entete">
+            <div>
+              <span className="sur-titre">AUTOUR DE VOUS</span>
+              <h2 id="titre-proximite">Des logements à proximité</h2>
+              <p>Découvrez les annonces disponibles dans un rayon de 25 km, classées du plus proche au plus éloigné.</p>
+            </div>
+            <button
+              className="proximite-accueil-action"
+              type="button"
+              onClick={rechercherAutourDeMoi}
+              disabled={etatProximite === "localisation" || etatProximite === "chargement"}
+            >
+              {etatProximite === "localisation"
+                ? "Localisation en cours..."
+                : etatProximite === "chargement"
+                  ? "Recherche des logements..."
+                  : positionVisiteur
+                    ? "Actualiser ma position"
+                    : "Trouver près de moi"}
+            </button>
+          </div>
+
+          {etatProximite === "repos" && (
+            <p className="proximite-accueil-note">Autorisez l’accès à votre position pour lancer la recherche. La fonction est disponible aux visiteurs et aux membres.</p>
+          )}
+          {etatProximite === "localisation" && <p className="proximite-accueil-etat" role="status">En attente de l’autorisation de localisation…</p>}
+          {etatProximite === "chargement" && <p className="proximite-accueil-etat" role="status">Recherche des logements disponibles dans un rayon de 25 km…</p>}
+          {etatProximite === "erreur" && <p className="message-erreur" role="alert">{erreurProximite}</p>}
+          {etatProximite === "termine" && logementsProches.length === 0 && (
+            <p className="proximite-accueil-etat" role="status">Aucun logement disponible n’a été trouvé dans un rayon de 25 km.</p>
+          )}
+          {etatProximite === "termine" && logementsProches.length > 0 && (
+            <>
+              <p className="proximite-accueil-compteur" role="status">
+                {logementsProches.length} logement{logementsProches.length === 1 ? "" : "s"} trouvé{logementsProches.length === 1 ? "" : "s"} près de vous
+              </p>
+              <div className="logements-grille proximite-accueil-grille">
+                {logementsProches.map((logement) => (
+                  <CarteLogement
+                    key={logement.id}
+                    logement={logement}
+                    onChoisir={onLogementChoisi}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
 
         {erreurChargement && <p className="message-erreur" role="alert">{erreurChargement}</p>}
 

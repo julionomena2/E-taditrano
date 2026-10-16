@@ -89,12 +89,12 @@ class LogementController extends Controller
     /**
      * Valide les coordonnées envoyées par React, calcule les distances et renvoie les annonces dans le rayon demandé.
      */
-    public function nearestFromEtablissement(Request $request)
+    public function nearest(Request $request)
     {
         $filters = $request->validate([
             'latitude' => ['required', 'numeric', 'between:-90,90'],
             'longitude' => ['required', 'numeric', 'between:-180,180'],
-            'rayon_km' => ['nullable', 'numeric', 'min:0.1'],
+            'rayon_km' => ['nullable', 'numeric', 'min:0.1', 'max:25'],
             'id_quartier' => ['sometimes', 'string', 'max:20', 'exists:quartiers,id_quartier'],
         ]);
 
@@ -102,29 +102,60 @@ class LogementController extends Controller
         $lng = $filters['longitude'];
         $rayon = $filters['rayon_km'] ?? 5;
 
-        $logements = Logement::with(['quartier:id_quartier,nom_quartier,id_ville', 'photos'])
-            ->selectRaw(
-                '
-                logements.*,
-                (
-                    6371 * acos(
-                        cos(radians(?)) *
-                        cos(radians(latitude)) *
-                        cos(radians(longitude) - radians(?)) +
-                        sin(radians(?)) * sin(radians(latitude))
-                    )
-                ) AS distance_km
-            ',
-                [$lat, $lng, $lat]
-            )
-            ->having('distance_km', '<=', $rayon)
+        $deltaLatitude = ($rayon / 110.574) * 1.01;
+        $maxAbsLatitude = min(90, abs($lat) + $deltaLatitude);
+        $longitudeScale = 111.32 * abs(cos(deg2rad($maxAbsLatitude)));
+        $deltaLongitude = $longitudeScale < 0.01 ? 180 : min(180, ($rayon / $longitudeScale) * 1.01);
+
+        $query = Logement::with(['quartier:id_quartier,nom_quartier,id_ville', 'photos'])
             ->when(
                 isset($filters['id_quartier']),
                 fn ($query) => $query->where('id_quartier', $filters['id_quartier']),
             )
             ->whereRaw('LOWER(status) = ?', ['disponible'])
-            ->orderBy('distance_km')
-            ->get();
+            ->whereNotNull('latitude')
+            ->whereNotNull('longitude')
+            ->whereBetween('latitude', [
+                max(-90, $lat - $deltaLatitude),
+                min(90, $lat + $deltaLatitude),
+            ]);
+
+        if ($deltaLongitude < 180) {
+            $longitudeMin = $lng - $deltaLongitude;
+            $longitudeMax = $lng + $deltaLongitude;
+
+            if ($longitudeMin < -180) {
+                $query->where(function ($query) use ($longitudeMin, $longitudeMax): void {
+                    $query->where('longitude', '>=', $longitudeMin + 360)
+                        ->orWhere('longitude', '<=', $longitudeMax);
+                });
+            } elseif ($longitudeMax > 180) {
+                $query->where(function ($query) use ($longitudeMin, $longitudeMax): void {
+                    $query->where('longitude', '>=', $longitudeMin)
+                        ->orWhere('longitude', '<=', $longitudeMax - 360);
+                });
+            } else {
+                $query->whereBetween('longitude', [$longitudeMin, $longitudeMax]);
+            }
+        }
+
+        $logements = $query->get()
+            ->map(function (Logement $logement) use ($lat, $lng): Logement {
+                $latitudeLogement = deg2rad((float) $logement->latitude);
+                $latitudeOrigine = deg2rad((float) $lat);
+                $differenceLatitude = deg2rad((float) $logement->latitude - (float) $lat);
+                $differenceLongitude = deg2rad((float) $logement->longitude - (float) $lng);
+                $haversine = sin($differenceLatitude / 2) ** 2
+                    + cos($latitudeOrigine) * cos($latitudeLogement) * sin($differenceLongitude / 2) ** 2;
+                $distance = 6371 * 2 * asin(min(1, sqrt(max(0, $haversine))));
+
+                $logement->setAttribute('distance_km', $distance);
+
+                return $logement;
+            })
+            ->filter(fn (Logement $logement): bool => $logement->distance_km <= $rayon)
+            ->sortBy('distance_km')
+            ->values();
 
         return response()->json($logements);
     }

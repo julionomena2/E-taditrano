@@ -38,6 +38,6 @@ Route::get('/villes', [VilleController::class, 'index']);
 Route::get('/quartiers', [QuartierController::class, 'index']);
 Route::get('/etablissements', [EtablissementController::class, 'index']);
 // La recherche de logements accepte un filtre de quartier ou les coordonnées d'un établissement proche.
-Route::get('/logements/proches', [LogementController::class, 'nearestFromEtablissement']);
+Route::get('/logements/proches', [LogementController::class, 'nearest']);
 Route::get('/logements', [LogementController::class, 'index']);
 Route::get('/logements/{id}', [LogementController::class, 'show'])->whereNumber('id');

@@ -90,4 +90,64 @@ class PublicCatalogApiTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('id_ville');
     }
+
+    public function test_nearby_housing_is_limited_to_the_radius_and_sorted_by_distance(): void
+    {
+        $ville = Ville::create(['id_ville' => 'ANT', 'nom_Ville' => 'Antananarivo']);
+        $quartier = Quartier::create([
+            'id_quartier' => 'Q-ANK',
+            'nom_quartier' => 'Ankatso',
+            'id_ville' => $ville->getKey(),
+        ]);
+        Utilisateur::create([
+            'id_utilisateur' => 'owner@example.mg',
+            'nom' => 'Rabe',
+            'prenom' => 'Miora',
+            'mot_de_passe' => 'secret123',
+            'telephone' => '0341234567',
+        ]);
+        $proche = $this->createHousingAt($quartier, 'proche', -18.9, 47.501);
+        $eloigne = $this->createHousingAt($quartier, 'eloigne', -18.9, 47.51);
+        $this->createHousingAt($quartier, 'hors-rayon', -18.9, 48);
+        $this->createHousingAt($quartier, 'indisponible', -18.9, 47.5005, 'Loué');
+        $this->createHousingAt($quartier, 'sans-coordonnees', null, null);
+
+        $response = $this->getJson('/api/logements/proches?latitude=-18.9&longitude=47.5&rayon_km=25')
+            ->assertOk()
+            ->assertJsonCount(2);
+
+        $this->assertSame($proche->id, $response->json('0.id'));
+        $this->assertSame($eloigne->id, $response->json('1.id'));
+        $this->assertLessThan(
+            (float) $response->json('1.distance_km'),
+            (float) $response->json('0.distance_km'),
+        );
+    }
+
+    public function test_nearby_housing_rejects_a_radius_above_twenty_five_kilometers(): void
+    {
+        $this->getJson('/api/logements/proches?latitude=-18.9&longitude=47.5&rayon_km=25.1')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('rayon_km');
+    }
+
+    private function createHousingAt(
+        Quartier $quartier,
+        string $description,
+        ?float $latitude,
+        ?float $longitude,
+        string $status = 'Disponible',
+    ): Logement {
+        return Logement::create([
+            'id_utilisateur' => 'owner@example.mg',
+            'id_quartier' => $quartier->getKey(),
+            'description' => $description,
+            'type_logement' => 'Studio',
+            'prix' => 150000,
+            'date_publication' => now()->toDateString(),
+            'status' => $status,
+            'latitude' => $latitude,
+            'longitude' => $longitude,
+        ]);
+    }
 }

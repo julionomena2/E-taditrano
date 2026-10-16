@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import GoogleMapPicker from "./GoogleMapPicker.jsx";
+import CarteEmplacement from "./CarteEmplacement.jsx";
 import {
   creerLogement,
   getQuartiersParVille,
@@ -435,7 +435,7 @@ export default function PublierAnnonce({ annonce = null, onPublie, onAnnulation 
             </label>
           </div>
 
-          <GoogleMapPicker
+          <CarteEmplacement
             ville={villeSelectionnee?.nom}
             quartier={quartierSelectionne?.nom}
             latitude={latitude}

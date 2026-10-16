@@ -1,9 +1,12 @@
-import { useState } from "react";
-import ItineraireLogement from "./ItineraireLogement.jsx";
-
 export default function DetailLogement({ logement, etablissement, onRetour, onContacter }) {
-  const [itineraireOuvert, setItineraireOuvert] = useState(false);
   const coordonneesDisponibles = logement.latitude !== null && logement.longitude !== null;
+  const urlItineraireGoogle = coordonneesDisponibles
+    ? `https://www.google.com/maps/dir/?${new URLSearchParams({
+      api: "1",
+      destination: `${logement.latitude},${logement.longitude}`,
+      travelmode: "driving",
+    })}`
+    : null;
 
   return (
     <section className="detail-logement">
@@ -40,13 +43,11 @@ export default function DetailLogement({ logement, etablissement, onRetour, onCo
       </div>
 
       <div className="actions">
-        <button
-          type="button"
-          onClick={() => setItineraireOuvert((ouvert) => !ouvert)}
-          disabled={!coordonneesDisponibles}
-        >
-          {itineraireOuvert ? "Masquer l’itinéraire" : "Voir l’itinéraire"}
-        </button>
+        {urlItineraireGoogle && (
+          <a href={urlItineraireGoogle} target="_blank" rel="noopener noreferrer">
+            Voir l’itinéraire dans Google Maps
+          </a>
+        )}
         <button type="button" onClick={() => onContacter(logement.proprietaireId)}>
           Contacter le propriétaire
         </button>
@@ -56,10 +57,6 @@ export default function DetailLogement({ logement, etablissement, onRetour, onCo
         <p className="itineraire-indisponible">
           L’itinéraire n’est pas disponible car cette annonce n’a pas de coordonnées enregistrées.
         </p>
-      )}
-
-      {itineraireOuvert && coordonneesDisponibles && (
-        <ItineraireLogement latitude={logement.latitude} longitude={logement.longitude} />
       )}
     </section>
   );

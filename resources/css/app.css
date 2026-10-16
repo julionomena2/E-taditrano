@@ -137,6 +137,52 @@ h1, h2, h3, p {
     resize: vertical;
 }
 
+.profile-photo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.profile-photo-button {
+    white-space: nowrap;
+}
+
+.profile-photo-dialog {
+    position: fixed;
+    inset: 0;
+    width: min(90vw, 800px);
+    max-width: none;
+    max-height: 90vh;
+    padding: 48px 20px 20px;
+    border: 0;
+    border-radius: 16px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+}
+
+.profile-photo-dialog::backdrop {
+    background: rgba(15, 23, 42, 0.72);
+}
+
+.profile-photo-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+.profile-photo-preview {
+    display: block;
+    width: 100%;
+    max-height: calc(90vh - 68px);
+    object-fit: contain;
+}
+
+.field-error {
+    color: var(--danger);
+    font-size: 0.85rem;
+}
+
 .primary-btn,
 .secondary-btn,
 .logout-btn,

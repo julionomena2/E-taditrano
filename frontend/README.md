@@ -45,17 +45,19 @@ https://nodejs.org (choisissez la version "LTS").
    (Sous Windows, avec l'invite de commandes classique, utilisez plutôt
    `copy .env.example .env`.)
 
-5. Pour les annonces et les itinéraires, créez une clé navigateur dans
-   Google Cloud Console, activez **Maps JavaScript API**, **Geocoding API**
-   et **Directions API (Legacy)**, puis renseignez `VITE_GOOGLE_MAPS_API_KEY`
-   dans `frontend/.env`. La clé
-   est visible dans le navigateur : limitez-la aux domaines de l'application
-   et à ces deux API. Ne placez pas une clé privée ou non restreinte dans ce
-   fichier.
+5. Aucune clé cartographique n'est nécessaire. Les cartes interactives
+   utilisent Leaflet et les tuiles OpenStreetMap ; le géocodage utilise le
+   service public Nominatim.
 
-      La géolocalisation de l’utilisateur nécessite son autorisation et un
-      contexte sécurisé : HTTPS en ligne, ou `localhost` en développement.
-      L’itinéraire est calculé en voiture et affiché dans la fiche du logement.
+   Le lien d'itinéraire ouvre Google Maps avec le logement comme destination ;
+   Maps utilise la position de l'utilisateur comme départ lorsqu'elle est
+   disponible et peut demander l'autorisation de localisation.
+
+   Les services publics OpenStreetMap sont soumis à leurs politiques d'usage
+   et ne garantissent pas de disponibilité. L'application limite les requêtes
+   Nominatim côté navigateur et affiche l'attribution OpenStreetMap sur les
+   cartes. Pour un usage important ou de production, configurez un fournisseur
+   de tuiles et de géocodage adapté au volume.
 
 ## 3. Lancer l'application en développement
 
@@ -122,7 +124,12 @@ L'API expose les routes de consultation suivantes :
 - `GET /api/quartiers?id_ville=...`
 - `GET /api/etablissements?id_ville=...` ou `?id_quartier=...`
 - `GET /api/logements?id_quartier=...`
-- `GET /api/logements/proches?latitude=...&longitude=...&id_quartier=...`
+- `GET /api/logements/proches?latitude=...&longitude=...&rayon_km=...&id_quartier=...`
+
+Sur la page d’accueil, le visiteur peut autoriser sa géolocalisation afin
+d’afficher les logements disponibles dans un rayon maximal de 25 km, du plus
+proche au plus éloigné. Les coordonnées servent à calculer la proximité dans
+l’API Laravel et ne sont pas enregistrées dans le profil.
 
 L'authentification utilise une session Laravel et un cookie de session
 HttpOnly : le navigateur ne conserve aucun mot de passe ni jeton
@@ -151,10 +158,11 @@ La messagerie nécessite une session utilisateur et stocke les messages dans la
 base de données. La liste n’affiche que les profils avec lesquels un message a
 déjà été échangé ; elle conserve ces profils et s’actualise périodiquement pour
 les nouveaux messages. Pour démarrer une conversation, contactez le propriétaire
-d’une annonce. Le temps réel n'est pas encore activé. L'intégration Google et
-la publication d'annonces nécessitent la configuration Google Maps ci-dessus.
-Les coordonnées sont choisies en cliquant sur la carte ; le centrage du
-quartier utilise le géocodage Google et n'impose pas de limite géographique.
+d’une annonce. Le temps réel n'est pas encore activé. Les cartes de
+publication utilisent OpenStreetMap, tandis que la connexion Google reste
+indépendante. Les coordonnées sont
+choisies en cliquant sur la carte ; le centrage du quartier utilise Nominatim,
+avec un repli sur la ville si le quartier n'est pas trouvé.
 Les annonces sont créées avec la date du jour et le statut « Disponible ».
 
 ## 6. Construire une version prête pour la mise en ligne
@@ -168,8 +176,6 @@ npm run build
 
 ## 7. Pistes pour la suite
 
-- Ajouter l'intégration Google Maps dans `DetailLogement.jsx`
-  (l'endroit exact est indiqué par un commentaire dans le fichier).
 - Ajouter l'espace Admin (« Gérer les comptes », « Gérer les données »).
 - Remplacer la navigation "à la main" (state `page` dans `App.jsx`) par
   la librairie `react-router-dom`, si vous voulez des adresses (URL)

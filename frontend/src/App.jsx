@@ -50,6 +50,7 @@ export default function App() {
   const [quartierChoisi, setQuartierChoisi] = useState(null);
   const [etablissementChoisi, setEtablissementChoisi] = useState(null);
   const [logementChoisi, setLogementChoisi] = useState(null);
+  const [origineDetailLogement, setOrigineDetailLogement] = useState("logements");
 
   useEffect(() => {
     let annule = false;
@@ -101,8 +102,9 @@ export default function App() {
   }
 
   // Étape 3 : un logement a été choisi -> on affiche sa fiche détaillée.
-  function gererLogementChoisi(logement) {
+  function gererLogementChoisi(logement, origine = "logements") {
     setLogementChoisi(logement);
+    setOrigineDetailLogement(origine);
     setPage("detailLogement");
   }
 
@@ -137,7 +139,13 @@ export default function App() {
   function afficherPage() {
     switch (page) {
       case "accueil":
-        return <Accueil onRechercheLogements={gererRechercheLogements} allerA={allerA} />;
+        return (
+          <Accueil
+            onRechercheLogements={gererRechercheLogements}
+            onLogementChoisi={(logement) => gererLogementChoisi(logement, "accueil")}
+            allerA={allerA}
+          />
+        );
 
       case "logements":
         return (
@@ -155,7 +163,7 @@ export default function App() {
           <DetailLogement
             logement={logementChoisi}
             etablissement={etablissementChoisi}
-            onRetour={() => setPage("logements")}
+            onRetour={() => setPage(origineDetailLogement)}
             onContacter={contacterProprietaire}
           />
         );
@@ -194,7 +202,13 @@ export default function App() {
         ) : <FormulaireConnexion onConnecte={gererConnexionReussie} allerA={allerA} />;
 
       default:
-        return <Accueil onRechercheLogements={gererRechercheLogements} allerA={allerA} />;
+        return (
+          <Accueil
+            onRechercheLogements={gererRechercheLogements}
+            onLogementChoisi={(logement) => gererLogementChoisi(logement, "accueil")}
+            allerA={allerA}
+          />
+        );
     }
   }
 

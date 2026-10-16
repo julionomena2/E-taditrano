@@ -19,7 +19,7 @@ function lireDetailsDescription(description = "") {
   };
 }
 
-function CarteLogement({ logement, onChoisir }) {
+export function CarteLogement({ logement, onChoisir }) {
   const [photoIndisponible, setPhotoIndisponible] = useState(false);
   const photoCouverture = logement.photos?.[0];
   const details = lireDetailsDescription(logement.description);

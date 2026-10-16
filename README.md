@@ -41,9 +41,9 @@ php artisan boost:install
 
 Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
-## Google Maps for establishments
+## Cartes et itinéraires
 
-Set `GOOGLE_MAPS_API_KEY` in `.env` to a Google Maps JavaScript API key with the Maps JavaScript API and Geocoding API enabled, and billing configured for the Google Cloud project. Restrict the key to the application's allowed website referrers. Selecting a neighborhood centers the map on it (or its city when the neighborhood is not found); clicking the map or dragging the marker fills in the latitude and longitude.
+The admin establishment map and the housing listing map use Leaflet with OpenStreetMap tiles and Nominatim geocoding; no Google Maps API key is required. Selecting a neighborhood centers the map on it (or its city when the neighborhood is not found); clicking the map or dragging the marker fills in the latitude and longitude. The route link opens Google Maps in a new tab with the housing coordinates as destination; Google Maps uses the user's location as the origin when available. OpenStreetMap's public tile and geocoding services have usage limits and no availability guarantee.
 
 ## Contributing
 
